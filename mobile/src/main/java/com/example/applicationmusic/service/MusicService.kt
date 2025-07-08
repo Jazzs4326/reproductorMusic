@@ -37,6 +37,11 @@ class MusicService : MediaSessionService() {
         
         // Inicializar el reproductor
         player = ExoPlayer.Builder(this).build()
+        player.addListener(object : androidx.media3.common.Player.Listener {
+            override fun onIsPlayingChanged(isPlaying: Boolean) {
+                notifyWearPlaybackState(isPlaying)
+            }
+        })
         
         // Crear el MediaSession
         mediaSession = MediaSession.Builder(this, player).build()
