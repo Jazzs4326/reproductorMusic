@@ -266,8 +266,8 @@ fun PlaylistItem(
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
             
-            // Botón de eliminar (solo para canciones seleccionadas manualmente)
-            if (onRemove != null && song.id.startsWith("temp_")) {
+            // Botón de eliminar (para cualquier canción de la lista)
+            if (onRemove != null) {
                 Spacer(modifier = Modifier.width(8.dp))
                 IconButton(
                     onClick = onRemove,
@@ -419,7 +419,7 @@ fun Playlist(
                         song = song,
                         isPlaying = song.id == currentSong?.id,
                         onClick = { viewModel.playSong(song) },
-                        onRemove = if (song.id.startsWith("temp_")) { { viewModel.removeSong(song) } } else null
+                        onRemove = { viewModel.removeSong(song) }
                     )
                 }
             }

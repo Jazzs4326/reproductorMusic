@@ -20,6 +20,12 @@ import com.example.applicationmusic.ui.components.PlayerControls
 import com.example.applicationmusic.ui.components.Playlist
 import com.example.applicationmusic.ui.theme.ApplicationMusicTheme
 import com.example.applicationmusic.viewmodel.MusicPlayerViewModel
+import androidx.media3.session.MediaController
+import androidx.media3.session.SessionToken
+import com.example.applicationmusic.service.MusicService
+import android.content.ComponentName
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 class MainActivity : FragmentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -83,8 +89,14 @@ fun MainScreen(
     LaunchedEffect(Unit) {
         try {
             viewModel.initializePlayer(context)
+            // Crear y conectar MediaController de forma asíncrona
+            val sessionToken = SessionToken(context, ComponentName(context, MusicService::class.java))
+            val controller = withContext(Dispatchers.IO) {
+                MediaController.Builder(context, sessionToken).buildAsync().get()
+            }
+            viewModel.setMediaController(controller)
         } catch (e: Exception) {
-            android.util.Log.e("MainScreen", "Error inicializando player: ${e.message}", e)
+            android.util.Log.e("MainScreen", "Error inicializando player/controller: ${e.message}", e)
         }
     }
     

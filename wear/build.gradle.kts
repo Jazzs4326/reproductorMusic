@@ -46,7 +46,9 @@ dependencies {
     implementation(libs.androidx.ui.graphics)
     implementation(libs.androidx.ui.tooling.preview)
     implementation(libs.androidx.compose.material)
+    implementation("androidx.compose.material:material-icons-extended:1.5.4")
     implementation(libs.androidx.compose.foundation)
+    implementation("androidx.wear.compose:compose-material:1.2.1")
     implementation(libs.androidx.wear.tooling.preview)
     implementation(libs.androidx.activity.compose)
     implementation(libs.androidx.core.splashscreen)
@@ -54,5 +56,5 @@ dependencies {
     androidTestImplementation(libs.androidx.ui.test.junit4)
     debugImplementation(libs.androidx.ui.tooling)
     debugImplementation(libs.androidx.ui.test.manifest)
-    wearApp(project(":wear"))
+    // wearApp(project(":wear")) // Esto no es necesario aquí, solo en el módulo mobile si usas multi-apk
 }

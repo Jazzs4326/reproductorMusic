@@ -18,7 +18,9 @@ import kotlinx.coroutines.launch
 
 class MusicPlayerViewModel : ViewModel() {
     
-    private var exoPlayer: ExoPlayer? = null
+    // Elimina ExoPlayer local
+    // private var exoPlayer: ExoPlayer? = null
+    private var mediaController: MediaController? = null
     
     private val _currentSong = MutableStateFlow<Song?>(null)
     val currentSong: StateFlow<Song?> = _currentSong.asStateFlow()
@@ -44,24 +46,24 @@ class MusicPlayerViewModel : ViewModel() {
     
     fun initializePlayer(context: Context) {
         // Inicializar ExoPlayer
-        exoPlayer = ExoPlayer.Builder(context).build().apply {
-            addListener(object : Player.Listener {
-                override fun onIsPlayingChanged(isPlaying: Boolean) {
-                    _isPlaying.value = isPlaying
-                }
+        // exoPlayer = ExoPlayer.Builder(context).build().apply {
+        //     addListener(object : Player.Listener {
+        //         override fun onIsPlayingChanged(isPlaying: Boolean) {
+        //             _isPlaying.value = isPlaying
+        //         }
                 
-                override fun onPlaybackStateChanged(playbackState: Int) {
-                    when (playbackState) {
-                        Player.STATE_READY -> {
-                            _duration.value = duration
-                        }
-                        Player.STATE_ENDED -> {
-                            playNext()
-                        }
-                    }
-                }
-            })
-        }
+        //         override fun onPlaybackStateChanged(playbackState: Int) {
+        //             when (playbackState) {
+        //                 Player.STATE_READY -> {
+        //                     _duration.value = duration
+        //                 }
+        //                 Player.STATE_ENDED -> {
+        //                     playNext()
+        //                 }
+        //             }
+        //         }
+        //     })
+        // }
         
         // Intentar cargar música del dispositivo, si no hay, mostrar mensaje
         try {
@@ -81,56 +83,85 @@ class MusicPlayerViewModel : ViewModel() {
         }
     }
     
+    fun setMediaController(controller: MediaController) {
+        mediaController = controller
+
+        controller.addListener(object : Player.Listener {
+            override fun onIsPlayingChanged(isPlaying: Boolean) {
+                _isPlaying.value = isPlaying
+            }
+            override fun onPlaybackStateChanged(playbackState: Int) {
+                _duration.value = controller.duration.coerceAtLeast(0L)
+            }
+            override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
+                val index = controller.currentMediaItemIndex
+                val song = _playlist.value.getOrNull(index)
+                if (song != null) {
+                    _currentSong.value = song
+                    _currentIndex.value = index
+                }
+            }
+            override fun onPositionDiscontinuity(reason: Int) {
+                _currentPosition.value = controller.currentPosition
+            }
+            override fun onEvents(player: Player, events: Player.Events) {
+                _currentPosition.value = player.currentPosition
+                _duration.value = player.duration.coerceAtLeast(0L)
+            }
+        })
+
+        viewModelScope.launch {
+            while (true) {
+                _currentPosition.value = controller.currentPosition
+                _duration.value = controller.duration.coerceAtLeast(0L)
+                kotlinx.coroutines.delay(500)
+            }
+        }
+    }
+
+    private fun syncPlaylistWithController() {
+        val items = _playlist.value.map { androidx.media3.common.MediaItem.fromUri(it.audioUri) }
+        mediaController?.setMediaItems(items)
+        mediaController?.prepare()
+    }
+
     fun playSong(song: Song) {
-        _currentSong.value = song
-        _currentIndex.value = _playlist.value.indexOf(song)
-        
-        // Reproducción real con ExoPlayer
-        val mediaItem = MediaItem.fromUri(song.audioUri)
-        exoPlayer?.apply {
-            setMediaItem(mediaItem)
-            prepare()
-            play()
+        val index = _playlist.value.indexOf(song)
+        if (index >= 0) {
+            mediaController?.seekToDefaultPosition(index)
+            mediaController?.play()
+            _currentSong.value = song
+            _currentIndex.value = index
         }
     }
     
     fun playPause() {
-        exoPlayer?.let { player ->
-            if (player.isPlaying) {
-                player.pause()
+        mediaController?.let { controller ->
+            if (controller.isPlaying) {
+                controller.pause()
             } else {
-                player.play()
+                controller.play()
             }
         }
     }
     
     fun playNext() {
-        val currentIdx = _currentIndex.value
-        val playlist = _playlist.value
-        if (playlist.isNotEmpty()) {
-            val nextIndex = (currentIdx + 1) % playlist.size
-            playSong(playlist[nextIndex])
-        }
+        mediaController?.seekToNextMediaItem()
     }
     
     fun playPrevious() {
-        val currentIdx = _currentIndex.value
-        val playlist = _playlist.value
-        if (playlist.isNotEmpty()) {
-            val prevIndex = if (currentIdx > 0) currentIdx - 1 else playlist.size - 1
-            playSong(playlist[prevIndex])
-        }
+        mediaController?.seekToPreviousMediaItem()
     }
     
     fun seekTo(position: Long) {
-        exoPlayer?.seekTo(position)
+        mediaController?.seekTo(position)
     }
     
     fun updatePosition() {
         viewModelScope.launch {
-            exoPlayer?.let { player ->
-                _currentPosition.value = player.currentPosition
-            }
+            // exoPlayer?.let { player ->
+            //     _currentPosition.value = player.currentPosition
+            // }
         }
     }
     
@@ -149,6 +180,7 @@ class MusicPlayerViewModel : ViewModel() {
         // Actualizar la playlist combinando música del dispositivo y archivos seleccionados
         val deviceSongs = _playlist.value.filter { it.id.startsWith("temp_").not() }
         _playlist.value = deviceSongs + currentList
+        syncPlaylistWithController()
         
         // Si no hay canción actual, establecer la nueva como actual
         if (_currentSong.value == null) {
@@ -158,19 +190,19 @@ class MusicPlayerViewModel : ViewModel() {
     }
     
     fun removeSong(song: Song) {
-        // Remover de la lista de archivos seleccionados
-        val updatedSelectedFiles = _selectedFiles.value.filter { it.id != song.id }
-        _selectedFiles.value = updatedSelectedFiles
-        
-        // Actualizar la playlist
-        val deviceSongs = _playlist.value.filter { it.id.startsWith("temp_").not() }
-        _playlist.value = deviceSongs + updatedSelectedFiles
-        
+        // Remover de la playlist (sin importar el origen)
+        val updatedPlaylist = _playlist.value.filter { it.id != song.id }
+        _playlist.value = updatedPlaylist
+
+        // Remover de la lista de seleccionados si aplica
+        _selectedFiles.value = _selectedFiles.value.filter { it.id != song.id }
+        syncPlaylistWithController()
+
         // Si la canción removida era la actual, cambiar a la siguiente
         if (_currentSong.value?.id == song.id) {
-            if (_playlist.value.isNotEmpty()) {
-                val newIndex = if (_currentIndex.value >= _playlist.value.size) 0 else _currentIndex.value
-                _currentSong.value = _playlist.value[newIndex]
+            if (updatedPlaylist.isNotEmpty()) {
+                val newIndex = if (_currentIndex.value >= updatedPlaylist.size) 0 else _currentIndex.value
+                _currentSong.value = updatedPlaylist[newIndex]
                 _currentIndex.value = newIndex
             } else {
                 _currentSong.value = null
@@ -183,6 +215,7 @@ class MusicPlayerViewModel : ViewModel() {
         _selectedFiles.value = emptyList()
         val deviceSongs = _playlist.value.filter { it.id.startsWith("temp_").not() }
         _playlist.value = deviceSongs
+        syncPlaylistWithController()
         
         if (_playlist.value.isNotEmpty()) {
             _currentSong.value = _playlist.value[0]
@@ -195,6 +228,7 @@ class MusicPlayerViewModel : ViewModel() {
     
     override fun onCleared() {
         super.onCleared()
-        exoPlayer?.release()
+        // exoPlayer?.release()
+        mediaController?.release()
     }
 } 
