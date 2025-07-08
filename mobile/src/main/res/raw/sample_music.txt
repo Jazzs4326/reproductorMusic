@@ -1,0 +1,7 @@
+Para agregar música real al reproductor, puedes:
+
+1. Copiar archivos MP3 a la carpeta "Music" de tu dispositivo
+2. Usar URLs de música libre en línea
+3. Descargar música desde servicios como Spotify
+
+El reproductor buscará automáticamente música en tu dispositivo. 

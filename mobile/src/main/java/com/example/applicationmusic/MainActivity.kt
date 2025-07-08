@@ -1,37 +1,73 @@
 package com.example.applicationmusic
 
 import android.os.Bundle
-import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.fragment.app.FragmentActivity
 import androidx.activity.enableEdgeToEdge
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.core.view.WindowCompat
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.applicationmusic.ui.components.PlayerControls
+import com.example.applicationmusic.ui.components.Playlist
 import com.example.applicationmusic.ui.theme.ApplicationMusicTheme
+import com.example.applicationmusic.viewmodel.MusicPlayerViewModel
 
-class MainActivity : ComponentActivity() {
+class MainActivity : FragmentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        enableEdgeToEdge()
-        WindowCompat.setDecorFitsSystemWindows(window, false)
         
-        setContent {
-            ApplicationMusicTheme {
-                Surface(
-                    modifier = Modifier.fillMaxSize(),
-                    color = MaterialTheme.colorScheme.background
-                ) {
-                    MainScreen()
+        try {
+            enableEdgeToEdge()
+            WindowCompat.setDecorFitsSystemWindows(window, false)
+            
+            setContent {
+                ApplicationMusicTheme {
+                    Surface(
+                        modifier = Modifier.fillMaxSize(),
+                        color = MaterialTheme.colorScheme.background
+                    ) {
+                        MainScreen()
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            // Log del error para debugging
+            android.util.Log.e("MainActivity", "Error en onCreate: ${e.message}", e)
+            
+            // Fallback simple si hay error
+            setContent {
+                ApplicationMusicTheme {
+                    Surface(
+                        modifier = Modifier.fillMaxSize(),
+                        color = MaterialTheme.colorScheme.background
+                    ) {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .padding(16.dp),
+                            verticalArrangement = Arrangement.Center,
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            Text(
+                                text = "Reproductor de Música",
+                                style = MaterialTheme.typography.headlineMedium
+                            )
+                            Spacer(modifier = Modifier.height(16.dp))
+                            Text(
+                                text = "Cargando...",
+                                style = MaterialTheme.typography.bodyLarge
+                            )
+                        }
+                    }
                 }
             }
         }
@@ -39,18 +75,44 @@ class MainActivity : ComponentActivity() {
 }
 
 @Composable
-fun MainScreen() {
+fun MainScreen(
+    viewModel: MusicPlayerViewModel = viewModel()
+) {
+    val context = LocalContext.current
+    
+    LaunchedEffect(Unit) {
+        try {
+            viewModel.initializePlayer(context)
+        } catch (e: Exception) {
+            android.util.Log.e("MainScreen", "Error inicializando player: ${e.message}", e)
+        }
+    }
+    
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .padding(16.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
+            .padding(16.dp)
     ) {
         Text(
-            text = "Hello World!",
-            style = MaterialTheme.typography.headlineMedium
+            text = "Reproductor de Música",
+            style = MaterialTheme.typography.headlineMedium,
+            modifier = Modifier.padding(bottom = 16.dp)
         )
+        
+        // Controles del reproductor
+        PlayerControls(viewModel = viewModel)
+        
+        Spacer(modifier = Modifier.height(24.dp))
+        
+        // Lista de canciones
+        Text(
+            text = "Lista de Reproducción",
+            style = MaterialTheme.typography.titleLarge,
+            modifier = Modifier.padding(bottom = 8.dp)
+        )
+        
+        // Lista de canciones con scroll propio
+        Playlist(viewModel = viewModel)
     }
 }
 
@@ -58,6 +120,26 @@ fun MainScreen() {
 @Composable
 fun MainScreenPreview() {
     ApplicationMusicTheme {
-        MainScreen()
+        Surface(
+            modifier = Modifier.fillMaxSize(),
+            color = MaterialTheme.colorScheme.background
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(16.dp)
+            ) {
+                Text(
+                    text = "Reproductor de Música",
+                    style = MaterialTheme.typography.headlineMedium,
+                    modifier = Modifier.padding(bottom = 16.dp)
+                )
+                
+                Text(
+                    text = "Vista previa del reproductor",
+                    style = MaterialTheme.typography.bodyLarge
+                )
+            }
+        }
     }
 }
